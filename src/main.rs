@@ -1,5 +1,4 @@
 mod encrypt;
-use std::fs;
 use std::time::Duration;
 use std::{io, thread};
 
@@ -91,6 +90,7 @@ fn login_test() {
     let _ = login("username", "password");
 }
 
+
 struct Config {
     username: String,
     password: String,
@@ -100,15 +100,14 @@ impl Config {
     fn validate_and_assemble(
         username: Option<&str>,
         password: Option<&str>,
-    ) -> Result<Self, &'static str> {
-        match (username, password) {
-            (Some(_), None) => Err("missing password"),
-            (None, Some(_)) => Err("missing username"),
-            (None, None) => Err("missing username and password"),
-            (Some(username), Some(password)) => Ok(Self {
-                username: username.to_owned(),
-                password: password.to_owned(),
-            }),
+    ) -> Self {
+        // 使用默认值填充缺失的配置项
+        let username = username.unwrap_or("username");
+        let password = password.unwrap_or("password");
+        
+        Self {
+            username: username.to_owned(),
+            password: password.to_owned(),
         }
     }
 
@@ -124,17 +123,17 @@ impl Config {
         let result = Self::validate_and_assemble(
             username.as_ref().map(String::as_str),
             password.as_ref().map(String::as_str),
-        )
-        .inspect_err(|err| println!("invalid configuration: {err}"))
-        .ok()?;
+        );
 
         Some(result)
     }
 
     pub fn from_file(path: &str) -> Option<Self> {
+        use std::fs;
+        
         println!("reading configuration from file: {path}");
 
-        let raw = fs::read(&path)
+        let raw = fs::read(path)
             .inspect_err(|err| println!("failed to read from {path}: {err}"))
             .ok()?;
 
@@ -145,9 +144,7 @@ impl Config {
         let mut lines = configuration.lines();
         let username = lines.next();
         let password = lines.next();
-        let result = Self::validate_and_assemble(username, password)
-            .inspect_err(|err| println!("invalid configuration: {err}"))
-            .ok()?;
+        let result = Self::validate_and_assemble(username, password);
 
         Some(result)
     }
@@ -167,7 +164,6 @@ impl Config {
         Self::from_file(&path)
     }
 }
-
 fn main() {
     let config = Config::from_args()
         .or_else(Config::from_env)
@@ -179,11 +175,11 @@ fn main() {
         match login(&config.username, &config.password) {
             Ok(_) => {
                 println!("login ok. awaiting...");
-                thread::sleep(Duration::from_secs(15));
+                thread::sleep(Duration::from_secs(120));
             }
             Err(e) => {
                 println!("error! {}", e);
-                thread::sleep(Duration::from_secs(1));
+                thread::sleep(Duration::from_secs(30));
             }
         }
     }
